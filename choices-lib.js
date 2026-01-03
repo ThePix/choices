@@ -5,7 +5,7 @@
 /*
 STATE
   
-An array of variable_states
+An array of variables
 Each variable_state has:
   name
   value
@@ -19,7 +19,6 @@ current_passage
   name
 */
 
-const variable_states = []
 const visited_passages = {}
 let current_passage
 
@@ -31,7 +30,7 @@ function toID(name) {
 }
 
 function find_variable_or_null(name) {
-  for (const el of variable_states) {
+  for (const el of variables) {
     if (el.name === name) return el
   }
   return null
@@ -42,12 +41,17 @@ function find_variable(name) {
   if (vari) return vari
   
   console.error("Failed to find a variable called '" + name + "'. This will not go well...")
-  console.error(variable_states)
+  console.error(variables)
   return null
 }
 
-function add_variable(name, value, type) {
-  variable_states.push({name:name, value:value, type:type})
+function add_variable(name, value, list) {
+  if (list === true) {
+    variables.push({name:name, value:value, money:true})
+  }
+  else {
+    variables.push({name:name, value:value, list:list})
+  }
 }
 
 function set_variable(name, value) {
@@ -141,6 +145,13 @@ function displayNumber(n, control) {
 
 // Unit tested!
 function get_value(s) {
+  const match = s.match(/^(random|die)\((\d+)\)/)
+  if (match) {
+    const max = parseInt(match[2])
+    const value = Math.floor(Math.random() * max)
+    return match[1] = 'die' ? value + 1 : value
+  }
+
   if (s === 'true') return true
   if (s === 'false') return false
   if (s.match(/^-?\d+$/)) return parseInt(s)
@@ -174,7 +185,15 @@ script might look like this:
 // Unit tested!
 function test_fragment(script) {
   script = script.trim()
-  const match = script.match(/(\w+)([=\<\>!]+)(.+)/)
+  let match
+  
+  match = script.match(/^%(\d+)/)
+  if (match) {
+    value = parseInt(match[1])
+    return (Math.random() * 100 < value)
+  }
+  
+  match = script.match(/(\w+)([=\<\>!]+)(.+)/)
   if (match) {
     const left_value = get_value(match[1])
     const right_value = get_value(match[3])
@@ -276,7 +295,6 @@ function run_fragment(script) {
 }
 
 
-// TODO unit test if + add else capability
 function run_script(script) {
   script = script.trim()
   let match
@@ -326,6 +344,23 @@ function run_script(script) {
 }
 
 
+function insert_values(s) {
+  for (const el of variables) {
+    let value = el.value
+    if (el.money) {
+      value = displayMoney(value)
+    }
+    if (typeof value == 'boolean' && el.list) {
+      value = value ? el.list[1] : el.list[0]
+    }
+    if (typeof value == 'number' && el.list && value >= 0 && value < el.list.length) {
+      value = el.list[value]
+    }
+    s = s.replaceAll('$' + el.name, value)
+  }
+  return s
+}
+
 // print set if include
 
 function process_text(s) {
@@ -344,7 +379,7 @@ function process_text(s) {
     }
     
     else if (halves[0].startsWith('log')) {
-      log(halves[0].substring(4))
+      log(insert_values(halves[0].substring(4)))
       result += halves[1]
     }
     
@@ -403,7 +438,10 @@ function process_text(s) {
   
   }
   if (result.includes('<<')) result = process_text(result)  // in case include has added anything
-  return result  
+  
+
+  
+  return insert_values(result)
 }
 
 
@@ -431,11 +469,12 @@ function assert_v(var1, flag2) {
 function unittest() {
 
   // setup
+  add_variable('unittest0', 427, true)
   add_variable('unittest1', 0)
-  add_variable('unittest2', 4)
+  add_variable('unittest2', 4, ['red', 'blue', 'green', 'yellow'])
   add_variable('unittest3', "")
   add_variable('unittest4', "MyTest")
-  add_variable('unittest5', false)
+  add_variable('unittest5', false, ['no', 'yes'])
   add_variable('unittest6', true)
 
   // --- get_value ---
@@ -597,6 +636,34 @@ function unittest() {
   result = process_text(s)
   assert(result, 'Here is some text. Less text.')
   
+  // --- process_text ($) ---
+  set_variable('unittest1', 4)
+  set_variable('unittest2', 3)
+  set_variable('unittest4', 'blue')
+  s = 'The value is $unittest1. It is still $unittest1. $unittest4'
+  result = process_text(s)
+  assert(result, 'The value is 4. It is still 4. blue')
+
+  s = 'The colour is $unittest2.'
+  result = process_text(s)
+  assert(result, 'The colour is yellow.')
+  set_variable('unittest2', -1)
+  result = process_text(s)
+  assert(result, 'The colour is -1.')
+  set_variable('unittest2', 4)
+  result = process_text(s)
+  assert(result, 'The colour is 4.')
+
+  set_variable('unittest5', true)
+  s = 'He says $unittest5.'
+  result = process_text(s)
+  assert(result, 'He says yes.')
+
+  s = 'The value is $unittest0.'
+  result = process_text(s)
+  assert(result, 'The value is $4.27.')
+
+  
   // --- test_choice_visible ---
   set_variable('unittest1', 4)
   set_variable('unittest2', -7)
@@ -662,7 +729,7 @@ function click(event) {
   const passage = find_passage(current_passage)
   const choice = find_choice(passage, event.target.id)
   
-  // TODO run script
+  if (choice.script) run_script(choice.script)
   
   const new_passage = find_passage(choice.name)
   visit(new_passage) 
@@ -732,15 +799,10 @@ function visit(passage) {
 
 
 function init() {
-
   const h1 = document.getElementById('title')
   h1.innerHTML = title
   document.title = title
 
-  for (const el of variables) {
-    add_variable(el.name, el.value, el.type)
-  }
   visit(find_passage(starting_passage))
   unittest()
-
 }
