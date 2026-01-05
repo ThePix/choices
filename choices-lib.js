@@ -85,6 +85,7 @@ function find_choice(passage, name) {
 
 
 function displayMoney(n) {
+  const money_format = get_variable('_money_format')
   if (typeof money_format === "undefined") throw "No format for money set ."
   const ary = money_format.split("!");
   if (ary.length === 2) {
@@ -145,11 +146,19 @@ function displayNumber(n, control) {
 
 // Unit tested!
 function get_value(s) {
-  const match = s.match(/^(random|die)\((\d+)\)/)
+  let match
+  match = s.match(/^(random|die)\((\d+)\)/)
   if (match) {
     const max = parseInt(match[2])
     const value = Math.floor(Math.random() * max)
     return match[1] = 'die' ? value + 1 : value
+  }
+  
+  // TODO handle passage names with spaces...
+  match = s.match(/^visited\((\w+)\)/)
+  if (match) {
+    const passage = find_passage(match[2])
+    return passage.name in visited_passages ? visited_passages[passage.name] : 0
   }
 
   if (s === 'true') return true
@@ -738,6 +747,7 @@ function click(event) {
 
 function visit(passage) {
   current_passage = passage.name
+  set_variable('_current_passage', passage.name)
   if (passage.name in visited_passages) {
     visited_passages[passage.name] += 1
   }
@@ -800,9 +810,10 @@ function visit(passage) {
 
 function init() {
   const h1 = document.getElementById('title')
+  const title = get_variable('_story_title')
   h1.innerHTML = title
   document.title = title
 
-  visit(find_passage(starting_passage))
+  visit(find_passage(get_variable('_starting_passage')))
   unittest()
 }

@@ -1,8 +1,9 @@
-const title = "Choices Test"
-const starting_passage = "start"
-const money_format = "!$1.2!($1.2)!"
 const variables = [
-  {name:'cash', value:423, type:'money'},
+  {name:'_story_title', value:'Choices Test'},
+  {name:'_starting_passage', value:'start'},
+  {name:'_current_passage', value:''},
+  {name:'_money_format', value:'!$1.2!($1.2)!'},
+  {name:'cash', value:423, money:true},
   {name:'hat colour', value:'blue'},
 ]
 
